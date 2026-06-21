@@ -31,4 +31,23 @@ export const fetchLiveMatches = async () => {
     console.error("Error fetching match data:", error);
     return [];
   }
+
+};
+
+export const fetchAiPrediction = async (match: any) => {
+  try {
+    const response = await fetch('https://e2match.vercel.app/api/predict', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ match })
+    });
+    
+    const data = await response.json();
+    return data.prediction || null;
+  } catch (error) {
+    console.error("Error fetching AI prediction:", error);
+    return null;
+  }
 };
