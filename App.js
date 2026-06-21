@@ -1,16 +1,32 @@
 
-// Purpose: Main entry point initializing the layout and importing components
-
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import AiCommentaryCard from './src/components/AiCommentaryCard';
+import AiForecasterCard from './src/components/AiForecasterCard';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  StatusBar, 
+  ScrollView, 
+  TouchableOpacity, 
+  FlatList, 
+  ActivityIndicator,
+  RefreshControl 
+} from 'react-native';
 import { Activity, Calendar, History, ListOrdered, Shield, Trophy } from 'lucide-react-native';
 
-// Importing custom components
 import Navbar from './src/components/Navbar';
 import MatchCard from './src/components/MatchCard';
+import { fetchLiveMatches } from './src/api/matchApi';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('LIVE');
+  const [matches, setMatches] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // State to track if the user is pulling down to refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const menuItems = [
     { id: 'LIVE', label: 'Live', icon: Activity },
@@ -21,11 +37,25 @@ export default function App() {
     { id: 'POLL', label: 'Poll', icon: Trophy },
   ];
 
-  const dummyMatches = [
-    { id: '1', home: 'France', away: 'Senegal', homeScore: 3, awayScore: 1, time: 'FT', hasHighlight: true },
-    { id: '2', home: 'England', away: 'Croatia', homeScore: 4, awayScore: 2, time: 'FT', hasHighlight: true },
-    { id: '3', home: 'Basake Holy Stars', away: 'Aduana Stars', homeScore: 0, awayScore: 0, time: '75\'', hasHighlight: false },
-  ];
+  useEffect(() => {
+    loadMatchData();
+  }, []);
+
+  const loadMatchData = async () => {
+    setIsLoading(true);
+    const data = await fetchLiveMatches();
+    setMatches(data);
+    setIsLoading(false);
+  };
+
+  // Function triggered when user pulls down the list
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    // Fetch fresh data from the API again
+    const freshData = await fetchLiveMatches();
+    setMatches(freshData);
+    setIsRefreshing(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,13 +87,28 @@ export default function App() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={dummyMatches}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MatchCard item={item} />}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#4f46e5" />
+        </View>
+      ) : (
+        <FlatList
+          data={matches}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <MatchCard item={item} />}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          // Adding the Pull-to-Refresh component here
+          refreshControl={
+            <RefreshControl 
+              refreshing={isRefreshing} 
+              onRefresh={onRefresh}
+              tintColor="#4f46e5" 
+              colors={["#4f46e5"]} 
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -77,5 +122,6 @@ const styles = StyleSheet.create({
   tabText: { color: '#94a3b8', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
   tabTextActive: { color: '#ffffff' },
   liveIndicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' },
-  listContainer: { padding: 15, gap: 15 }
+  listContainer: { padding: 15, gap: 15 },
+  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

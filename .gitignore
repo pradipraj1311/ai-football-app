@@ -25,16 +25,27 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
+
+# Certificates
 *.pem
 
 # local env files
-.env*.local
+# Exclude all environment files to prevent leaking sensitive credentials.
+# It's a good practice to create a `.env.example` file with dummy values and commit it.
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
+
+# Editor-specific files
+.idea/
+.vscode/
 
 # generated native folders
 /ios
