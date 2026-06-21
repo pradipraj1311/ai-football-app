@@ -1,4 +1,4 @@
-// Purpose: Renders the top navigation bar with logo and tagline
+//  Renders the top navigation bar with logo and tagline
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
