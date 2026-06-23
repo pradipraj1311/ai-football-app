@@ -1,4 +1,3 @@
-// App.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView } from 'react-native';
 import { Activity, Calendar, History, ListOrdered, Shield, Trophy } from 'lucide-react-native';
@@ -9,6 +8,7 @@ import AiCommentaryCard from './src/components/AiCommentaryCard';
 import AiForecasterCard from './src/components/AiForecasterCard';
 import { fetchLiveMatches } from './src/api/matchApi';
 import FanPoll from './src/components/FanPoll';
+import StandingsTable from './src/components/StandingsTable'; 
 import { GLOBAL_TEAMS_DIRECTORY } from './src/data';
 
 export default function App() {
@@ -49,6 +49,13 @@ export default function App() {
     return <MatchDetails match={selectedMatch} onBack={() => setSelectedMatch(null)} />;
   }
 
+  const filteredMatches = matches.filter((m: any) => {
+    if (activeTab === 'LIVE') return m.status === 'LIVE';
+    if (activeTab === 'UPCOMING') return m.status === 'UPCOMING' || m.status === 'SCHEDULED';
+    if (activeTab === 'FINISHED') return m.status === 'FINISHED' || m.status === 'FT';
+    return true;
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0B1121" translucent={true} />
@@ -76,7 +83,11 @@ export default function App() {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            {activeTab === 'POLL' ? (
+            {activeTab === 'STANDINGS' ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
+                <StandingsTable />
+              </ScrollView>
+            ) : activeTab === 'POLL' ? (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
                 <FanPoll />
               </ScrollView>
@@ -92,9 +103,13 @@ export default function App() {
                   ))}
                 </View>
               </ScrollView>
+            ) : filteredMatches.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={{ color: '#64748b', fontSize: 14, fontWeight: 'bold' }}>No matches found for this category.</Text>
+              </View>
             ) : (
               <FlatList
-                data={matches}
+                data={filteredMatches}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}

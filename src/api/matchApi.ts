@@ -1,4 +1,3 @@
-// src/api/matchApi.ts
 
 const API_URL = 'https://e2match.vercel.app/api/live-matches';
 
@@ -49,5 +48,22 @@ export const fetchAiPrediction = async (match: any) => {
   } catch (error) {
     console.error("Error fetching AI prediction:", error);
     return null;
+  }
+};
+
+export const fetchStandings = async (tournamentId = '16', seasonId = '52186') => {
+  try {
+    const response = await fetch(`https://e2match.vercel.app/api/standings?tournamentId=${tournamentId}&seasonId=${seasonId}`);
+    
+    if (response.status === 503) {
+      console.warn("Server is under maintenance.");
+      return [];
+    }
+
+    const data = await response.json();
+    return data.standings || [];
+  } catch (error) {
+    console.error("Error fetching standings:", error);
+    return [];
   }
 };
