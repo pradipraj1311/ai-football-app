@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Platform, StatusBar, ActivityIndicator } from 'react-native';
-import { ArrowLeft, BrainCircuit, Activity } from 'lucide-react-native';
+import { ArrowLeft, BrainCircuit, Activity, Youtube } from 'lucide-react-native';
 import { fetchAiPrediction } from '../api/matchApi';
+import YoutubePlayer from "react-native-youtube-iframe"; 
 
 export default function MatchDetails({ match, onBack }: { match: any, onBack: () => void }) {
     const [activeTab, setActiveTab] = useState('ANALYSIS');
@@ -73,11 +74,82 @@ export default function MatchDetails({ match, onBack }: { match: any, onBack: ()
                 </View>
             );
         }
-        return (
-            <View style={styles.aiBox}>
-                <Text style={styles.aiText}>Content for {activeTab} will appear here.</Text>
-            </View>
-        );
+
+        if (activeTab === 'TELEMETRY') {
+            const stats = match.stats || { possession: { home: 50, away: 50 }, shots: { home: 0, away: 0 }, shotsOnTarget: { home: 0, away: 0 }, corners: { home: 0, away: 0 } };
+            
+            const renderStatBar = (label: string, homeVal: number, awayVal: number, isPercentage: boolean = false) => {
+                const total = homeVal + awayVal || 1; 
+                const homePerc = (homeVal / total) * 100;
+                const awayPerc = (awayVal / total) * 100;
+                
+                return (
+                    <View style={styles.statRow} key={label}>
+                        <View style={styles.statLabels}>
+                            <Text style={styles.statValue}>{homeVal}{isPercentage ? '%' : ''}</Text>
+                            <Text style={styles.statName}>{label}</Text>
+                            <Text style={styles.statValue}>{awayVal}{isPercentage ? '%' : ''}</Text>
+                        </View>
+                        <View style={styles.statBarContainer}>
+                            <View style={[styles.statBarHome, { width: `${homePerc}%` }]} />
+                            <View style={[styles.statBarAway, { width: `${awayPerc}%` }]} />
+                        </View>
+                    </View>
+                );
+            };
+
+            return (
+                <View style={styles.aiBox}>
+                    <View style={styles.aiHeader}>
+                        <Activity color="#10b981" size={20} />
+                        <Text style={[styles.aiTitle, { color: '#10b981' }]}>LIVE MATCH TELEMETRY</Text>
+                    </View>
+
+                    {match.status === 'UPCOMING' || match.status === 'SCHEDULED' ? (
+                        <Text style={styles.aiText}>Telemetry data will be available once the match starts.</Text>
+                    ) : (
+                        <View style={styles.statsContainer}>
+                            {renderStatBar('Ball Possession', stats.possession?.home || 50, stats.possession?.away || 50, true)}
+                            {renderStatBar('Total Shots', stats.shots?.home || 0, stats.shots?.away || 0)}
+                            {renderStatBar('Shots on Target', stats.shotsOnTarget?.home || 0, stats.shotsOnTarget?.away || 0)}
+                            {renderStatBar('Corner Kicks', stats.corners?.home || 0, stats.corners?.away || 0)}
+                            {renderStatBar('Fouls', stats.fouls?.home || 0, stats.fouls?.away || 0)}
+                            {renderStatBar('Yellow Cards', stats.yellowCards?.home || 0, stats.yellowCards?.away || 0)}
+                        </View>
+                    )}
+                </View>
+            );
+        }
+
+        if (activeTab === 'HIGHLIGHTS') {
+            return (
+                <View style={styles.aiBox}>
+                    <View style={styles.aiHeader}>
+                        <Youtube color="#ef4444" size={20} />
+                        <Text style={[styles.aiTitle, { color: '#ffffff' }]}>OFFICIAL HIGHLIGHTS</Text>
+                    </View>
+                    
+                    {match.youtubeHighlightId ? (
+                        <View style={styles.videoContainer}>
+                            <YoutubePlayer
+                                height={200}
+                                play={true}
+                                videoId={match.youtubeHighlightId}
+                                forceAndroidAutoplay={true}
+                            />
+                            <Text style={styles.videoSubText}>
+                                Watch the key moments from {match.home} vs {match.away}. 
+                                Courtesy of official broadcasters.
+                            </Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.aiText}>Highlights are currently not available for this match.</Text>
+                    )}
+                </View>
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -123,6 +195,12 @@ export default function MatchDetails({ match, onBack }: { match: any, onBack: ()
                             <Activity color={activeTab === 'TELEMETRY' ? "#ffffff" : "#64748b"} size={16} />
                             <Text style={[styles.tabText, activeTab === 'TELEMETRY' && styles.tabTextActive]}>Telemetry</Text>
                         </TouchableOpacity>
+                        {match.youtubeHighlightId && (
+                            <TouchableOpacity onPress={() => setActiveTab('HIGHLIGHTS')} style={[styles.tabBtn, activeTab === 'HIGHLIGHTS' && styles.tabBtnActive]}>
+                                <Youtube color={activeTab === 'HIGHLIGHTS' ? "#ffffff" : "#64748b"} size={16} />
+                                <Text style={[styles.tabText, activeTab === 'HIGHLIGHTS' && styles.tabTextActive]}>Highlights</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {renderContent()}
@@ -164,5 +242,15 @@ const styles = StyleSheet.create({
     probabilityContainer: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8, gap: 2 },
     probBar: { height: '100%' },
     probLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    probText: { color: '#64748b', fontSize: 10, fontWeight: 'bold' }
+    probText: { color: '#64748b', fontSize: 10, fontWeight: 'bold' },
+    statsContainer: { gap: 15, marginTop: 10 },
+    statRow: { gap: 8 },
+    statLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    statValue: { color: '#ffffff', fontSize: 14, fontWeight: 'bold' },
+    statName: { color: '#64748b', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
+    statBarContainer: { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#1e293b', gap: 2 },
+    statBarHome: { height: '100%', backgroundColor: '#4f46e5' },
+    statBarAway: { height: '100%', backgroundColor: '#ef4444' },
+    videoContainer: { marginTop: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#020617' },
+    videoSubText: { color: '#94a3b8', fontSize: 12, marginTop: 12, lineHeight: 18, textAlign: 'center' }
 });
