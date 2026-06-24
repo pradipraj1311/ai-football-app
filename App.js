@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView } from 'react-native';
 import { Activity, Calendar, History, ListOrdered, Shield, Trophy } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+
 import Navbar from './src/components/Navbar';
 import MatchCard from './src/components/MatchCard';
 import MatchDetails from './src/components/MatchDetails';
@@ -11,13 +14,25 @@ import FanPoll from './src/components/FanPoll';
 import StandingsTable from './src/components/StandingsTable'; 
 import { GLOBAL_TEAMS_DIRECTORY } from './src/data';
 
+// --- PUSH NOTIFICATION SETTINGS ---
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+// ----------------------------------
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('LIVE');
   const [matches, setMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [expoPushToken, setExpoPushToken] = useState('');
 
+  // 1. ADDED BACK: The missing menuItems array
   const menuItems = [
     { id: 'LIVE', label: 'Live', icon: Activity },
     { id: 'UPCOMING', label: 'Upcoming', icon: Calendar },
@@ -28,6 +43,10 @@ export default function App() {
   ];
 
   useEffect(() => {
+    registerForPushNotificationsAsync().then(token => {
+      if (token) setExpoPushToken(token);
+    });
+
     loadMatchData();
   }, []);
 
@@ -44,6 +63,38 @@ export default function App() {
     setMatches(freshData);
     setIsRefreshing(false);
   };
+
+  async function registerForPushNotificationsAsync() {
+    let token;
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4f46e5',
+      });
+    }
+
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: 'your-project-id-here', 
+      })).data;
+      console.log("Expo Push Token:", token);
+    } else {
+      console.log('Must use physical device for Push Notifications');
+    }
+    return token;
+  }
 
   if (selectedMatch) {
     return <MatchDetails match={selectedMatch} onBack={() => setSelectedMatch(null)} />;
