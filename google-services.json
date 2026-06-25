@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "482500698746",
+    "project_id": "e2match-ca1e7",
+    "storage_bucket": "e2match-ca1e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482500698746:android:cf0e9d26eb8b002b5b51c3",
+        "android_client_info": {
+          "package_name": "com.e2soft.e2match"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzf6xcqUNR7V7YRFZrFYPf4bTKQJHZAEc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
