@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView, PermissionsAndroid, Alert } from 'react-native';
 import { Activity, Calendar, History, ListOrdered, Shield, Trophy } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import messaging from '@react-native-firebase/messaging';
 
 import Navbar from './src/components/Navbar';
@@ -12,14 +13,14 @@ import { fetchLiveMatches } from './src/api/matchApi';
 import FanPoll from './src/components/FanPoll';
 import StandingsTable from './src/components/StandingsTable';
 import { GLOBAL_TEAMS_DIRECTORY } from './src/data';
-
+// Note: background-message handler is registered in index.js (it must be
+// registered at module load time, not inside a React component).
 export default function App() {
   const [activeTab, setActiveTab] = useState('LIVE');
   const [matches, setMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
-
   const menuItems = [
     { id: 'LIVE', label: 'Live', icon: Activity },
     { id: 'UPCOMING', label: 'Upcoming', icon: Calendar },
@@ -28,36 +29,77 @@ export default function App() {
     { id: 'TEAMS', label: 'Teams', icon: Shield },
     { id: 'POLL', label: 'Poll', icon: Trophy },
   ];
-
   useEffect(() => {
-    setupFirebaseMessaging();
-
     loadMatchData();
   }, []);
 
-  const setupFirebaseMessaging = async () => {
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  // --- Push Notification Setup ---
+  useEffect(() => {
+    const setupNotifications = async () => {
+      if (Platform.OS === 'android') {
+        // POST_NOTIFICATIONS permission is only required for Android 13+ (API level 33)
+        if (Platform.Version >= 33) {
+          try {
+            // First, check if we already have permission
+            const hasPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+            if (hasPermission) {
+              console.log('Notification permission already granted.');
+              getFcmToken();
+              return; // Permission already there, no need to ask
+            }
 
-    if (enabled) {
-      console.log('Firebase Notification Permission granted.');
+            // If not, request it using the standard system dialog
+            const status = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+            if (status === PermissionsAndroid.RESULTS.GRANTED) {
+              console.log('Notification permission granted.');
+              getFcmToken();
+            } else {
+              console.log('Notification permission denied by user.');
+              // This alert is shown *after* the user denies the system prompt.
+              Alert.alert(
+                'Permission Denied',
+                'You will not receive push notifications. To enable them, please go to your app settings.'
+              );
+            }
+          } catch (err) {
+            console.warn('Requesting notification permission failed', err);
+          }
+        } else {
+          // On Android 12 and below, permission is granted by default and doesn't need to be asked.
+          console.log('On Android 12 or below, no permission request is needed.');
+          getFcmToken();
+        }
+      }
+    };
 
-      messaging()
-        .subscribeToTopic('global_goal_alerts')
-        .then(() => console.log('Subscribed to global_goal_alerts topic!'))
-        .catch(e => console.log('Topic subscription failed:', e));
+    const getFcmToken = async () => {
+      try {
+        const token = await messaging().getToken();
+        console.log('================================================');
+        console.log('Your Firebase Cloud Messaging (FCM) token is:');
+        console.log(token);
+        console.log('================================================');
 
-      const unsubscribe = messaging().onMessage(async remoteMessage => {
-        Alert.alert(
-          remoteMessage.notification?.title || 'Goal Update!',
-          remoteMessage.notification?.body || ''
-        );
-      });
-      return unsubscribe;
-    }
-  };
+        await messaging().subscribeToTopic('global_goal_alerts');
+        console.log('Successfully subscribed to topic: global_goal_alerts');
+
+        // TODO: Send this token to your backend server!
+        // Your backend needs this token to send notifications to this specific device.
+      } catch (error) {
+        console.log('Error getting FCM token or subscribing to topic:', error);
+      }
+    };
+
+    setupNotifications();
+
+    // 3. Listen for foreground messages (when the app is open)
+    const unsubscribe = messaging().onMessage(async remoteMessage => {
+      console.log('A new FCM message arrived in the foreground!', JSON.stringify(remoteMessage));
+      Alert.alert('New Notification', remoteMessage.notification?.title + '\n' + remoteMessage.notification?.body);
+    });
+
+    return unsubscribe; // Unsubscribe when the component unmounts
+  }, []);
 
   const loadMatchData = async () => {
     setIsLoading(true);
@@ -65,7 +107,6 @@ export default function App() {
     setMatches(data);
     setIsLoading(false);
   };
-
   const onRefresh = async () => {
     setIsRefreshing(true);
     const freshData = await fetchLiveMatches();
