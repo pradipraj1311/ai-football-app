@@ -1,31 +1,89 @@
-
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Trophy } from 'lucide-react-native';
-import { INITIAL_POLL_DATA } from '../data';
 
 export default function FanPoll() {
-  const [pollData, setPollData] = useState(INITIAL_POLL_DATA);
+  const [pollData, setPollData] = useState([]);
   const [hasVoted, setHasVoted] = useState(false);
-  
-  const totalVotes = pollData.reduce((sum, item) => sum + item.votes, 0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVoting, setIsVoting] = useState(false);
 
-  const handleVote = (teamId: string) => {
-    if (hasVoted) return;
-    
+  const totalVotes = pollData.reduce((sum, item) => sum + (Number(item.votes) || 0), 0);
+
+  // Fetch live poll data from backend on component mount
+  useEffect(() => {
+    fetchPollData();
+  }, []);
+
+  const fetchPollData = async () => {
+    try {
+      const response = await fetch('https://e2match.vercel.app/api/poll');
+      if (!response.ok) throw new Error('Failed to fetch poll');
+      const data = await response.json();
+
+      // Map backend database format to component format if necessary
+      const formattedData = data.map((item: any) => ({
+        id: item.team_id || item.id,
+        name: item.team_name || item.name,
+        logo: item.logo || '⚽',
+        votes: Number(item.votes) || 0
+      }));
+
+      setPollData(formattedData);
+    } catch (error) {
+      console.warn('Error fetching poll data:', error);
+      // Fallback to static data if backend fails
+      setPollData([
+        { id: 't1', name: 'Argentina', logo: '🇦🇷', votes: 450 },
+        { id: 't2', name: 'France', logo: '🇫🇷', votes: 380 },
+        { id: 't4', name: 'England', logo: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', votes: 320 },
+        { id: 't3', name: 'Brazil', logo: '🇧🇷', votes: 290 },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVote = async (teamId: string) => {
+    if (hasVoted || isVoting) return;
+
+    setIsVoting(true);
+
+    // Optimistic UI update for immediate feedback
     const updatedData = pollData.map(team => {
       if (team.id === teamId) {
         return { ...team, votes: team.votes + 1 };
       }
       return team;
     });
-    
-    // Sort by votes
     updatedData.sort((a, b) => b.votes - a.votes);
-    
     setPollData(updatedData);
     setHasVoted(true);
+
+    // Send vote to backend
+    try {
+      await fetch('https://e2match.vercel.app/api/poll/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    } catch (error) {
+      console.warn('Error submitting vote:', error);
+    } finally {
+      setIsVoting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }]}>
+        <ActivityIndicator size="small" color="#4f46e5" />
+        <Text style={{ color: '#64748b', marginTop: 10, fontSize: 12 }}>Loading global poll...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -39,14 +97,16 @@ export default function FanPoll() {
 
       <View style={styles.pollContainer}>
         {pollData.map((team) => {
-          const percentage = ((team.votes / totalVotes) * 100).toFixed(1);
-          
+          // Calculate percentage safely
+          const rawPercentage = totalVotes > 0 ? (team.votes / totalVotes) * 100 : 0;
+          const percentage = rawPercentage.toFixed(1);
+
           return (
-            <TouchableOpacity 
-              key={team.id} 
-              style={styles.pollOption} 
+            <TouchableOpacity
+              key={team.id}
+              style={styles.pollOption}
               onPress={() => handleVote(team.id)}
-              disabled={hasVoted}
+              disabled={hasVoted || isVoting}
               activeOpacity={0.8}
             >
               <View style={styles.optionHeader}>
@@ -56,7 +116,7 @@ export default function FanPoll() {
                 </View>
                 {hasVoted && <Text style={styles.percentageText}>{percentage}%</Text>}
               </View>
-              
+
               {hasVoted && (
                 <View style={styles.barBackground}>
                   <View style={[styles.barFill, { width: `${percentage}%` }]} />
@@ -66,7 +126,7 @@ export default function FanPoll() {
           );
         })}
       </View>
-      
+
       {hasVoted && <Text style={styles.thanksText}>Thanks for voting! Global results updated.</Text>}
     </View>
   );

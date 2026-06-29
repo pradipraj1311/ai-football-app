@@ -1,18 +1,18 @@
 import { registerRootComponent } from 'expo';
-import messaging from '@react-native-firebase/messaging';
+import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
 import App from './App';
 
-// Register the background message handler BEFORE registerRootComponent so
-// it is set up at the native entry point (as required by RN Firebase).
+// Set up the background message handler for Firebase Cloud Messaging.
+// This must be called outside of the component lifecycle, at the app's entry point.
 try {
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
+  const messagingInstance = getMessaging();
+  setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
     console.log('Message handled in the background!', remoteMessage);
   });
 } catch (e) {
-  console.warn('Firebase messaging not available, skipping background handler:', e?.message);
+  console.warn('Firebase messaging not available, skipping background handler setup:', e?.message);
 }
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
+// Register the root component. This must be the last line to ensure the
+// app boots correctly.
 registerRootComponent(App);
