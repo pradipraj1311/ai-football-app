@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView, PermissionsAndroid, Alert } from 'react-native';
-import { Activity, Calendar, History, ListOrdered, Shield, Trophy } from 'lucide-react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView, PermissionsAndroid, Alert, LayoutAnimation, UIManager } from 'react-native';
+import { Activity, Calendar, History, ListOrdered, Shield, Trophy, BellRing } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Modular imports for Firebase v22+
@@ -15,6 +15,14 @@ import AiForecasterCard from './src/components/AiForecasterCard';
 import { fetchLiveMatches, fetchUpcomingMatches, fetchCompletedMatches, fetchTeams } from './src/api/matchApi';
 import FanPoll from './src/components/FanPoll';
 import StandingsTable from './src/components/StandingsTable';
+
+// Enable LayoutAnimation for Android
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('LIVE');
@@ -44,9 +52,9 @@ export default function App() {
           fetchLiveMatches(),
           fetchTeams(),
         ]);
-        
+
         setMatches(matchData || []);
-        
+
         // Priority: 1. Server Data, 2. Local Fallback
         if (teamData && teamData.length > 0) {
           setTeams(teamData);
@@ -129,6 +137,8 @@ export default function App() {
   };
 
   const handleTabChange = (tabId) => {
+    // Add a smooth animation for the tab transition
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveTab(tabId);
     setSelectedTeam(null);
   };
@@ -147,6 +157,25 @@ export default function App() {
       <StatusBar barStyle="light-content" backgroundColor="#0B1121" translucent={true} />
       <View style={styles.container}>
         <Navbar />
+
+        {/* 🌟 NEW: DISCOVERABLE FOLLOW BANNER 🌟 */}
+        {activeTab !== 'TEAMS' && !selectedTeam && !selectedMatch && (
+          <TouchableOpacity
+            style={styles.followBanner}
+            onPress={() => handleTabChange('TEAMS')}
+          >
+            <View style={styles.bannerIconBg}>
+              <BellRing color="#10b981" size={20} />
+            </View>
+            <View style={styles.bannerTextContainer}>
+              <Text style={styles.bannerTitle}>Never miss a goal!</Text>
+              <Text style={styles.bannerSub}>Pick your favorite team for instant alerts.</Text>
+            </View>
+            <View style={styles.bannerArrow}>
+              <Text style={{ color: '#fff', fontSize: 16 }}>→</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.menuWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.menuContainer}>
@@ -179,6 +208,10 @@ export default function App() {
               </ScrollView>
             ) : activeTab === 'TEAMS' ? (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
+                {/* ✨ NEW: INSTRUCTIONAL TEXT FOR TEAMS TAB ✨ */}
+                <Text style={styles.teamsInstruction}>
+                  Select your favorite team to get instant goal alerts!
+                </Text>
                 <View style={styles.teamsGrid}>
                   {teams.map((team) => (
                     <TouchableOpacity
@@ -227,6 +260,44 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0B1121' },
   container: { flex: 1, backgroundColor: '#020617', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  followBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    marginHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 5,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  bannerIconBg: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    padding: 10,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+  bannerTextContainer: {
+    flex: 1,
+  },
+  bannerTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  bannerSub: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bannerArrow: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
   menuWrapper: { backgroundColor: '#0B1121', borderBottomWidth: 1, borderBottomColor: '#1e293b', paddingVertical: 12, paddingHorizontal: 12 },
   menuContainer: { paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 8 },
   tabButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, gap: 8 },
@@ -236,6 +307,13 @@ const styles = StyleSheet.create({
   liveIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
   listContainer: { padding: 15, gap: 15 },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  teamsInstruction: {
+    color: '#94a3b8',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
   teamsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
   teamCard: { backgroundColor: '#0B1121', width: '48%', padding: 20, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1e293b' },
   teamLogoGrid: { fontSize: 40, marginBottom: 12 },

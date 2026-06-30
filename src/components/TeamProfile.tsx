@@ -1,14 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { ArrowLeft, Shield, Activity, Calendar, Trophy } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { ArrowLeft, Shield, Activity, Calendar, Trophy, BellRing, Bell, Zap } from 'lucide-react-native';
 import { fetchLiveMatches, fetchUpcomingMatches, fetchCompletedMatches } from '../api/matchApi';
 import MatchCard from './MatchCard';
+import { getMessaging, subscribeToTopic, unsubscribeFromTopic } from '@react-native-firebase/messaging';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function TeamProfile({ team, onBack }: any) {
   const [realStats, setRealStats] = useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [teamMatches, setTeamMatches] = useState<any[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+
+  // Follow/Notification State
+  const [isFollowing, setIsFollowing] = useState(false);
+  const topicName = `team_${team.code}`; // e.g., 'team_ARG'
+
+  // Fetch follow status from local storage
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      try {
+        const storedStatus = await AsyncStorage.getItem(topicName);
+        if (storedStatus === 'true') {
+          setIsFollowing(true);
+        }
+      } catch (error) {
+        console.warn("Could not load follow status:", error);
+      }
+    };
+    checkFollowStatus();
+  }, [topicName]);
+
+  // Handle Follow/Unfollow Button Press
+  const toggleFollow = async () => {
+    try {
+      const messagingInstance = getMessaging();
+
+      if (isFollowing) {
+        // Unsubscribe
+        await unsubscribeFromTopic(messagingInstance, topicName);
+        await AsyncStorage.removeItem(topicName);
+        setIsFollowing(false);
+        Alert.alert("Alerts Disabled 🔕", `You will no longer receive exclusive goal alerts for ${team.name}.`);
+      } else {
+        // Subscribe
+        await subscribeToTopic(messagingInstance, topicName);
+        await AsyncStorage.setItem(topicName, 'true');
+        setIsFollowing(true);
+        Alert.alert("Alerts Enabled ⚡", `Awesome! You will now receive instant goal notifications whenever ${team.name} scores!`);
+      }
+    } catch (error) {
+      console.warn("Subscription error:", error);
+      Alert.alert("Error", "Could not update notification preferences.");
+    }
+  };
 
   // Fetch live team statistics from backend
   useEffect(() => {
@@ -85,6 +130,23 @@ export default function TeamProfile({ team, onBack }: any) {
               <Text style={styles.teamCountry}>{displayCountry} • Est. {team.founded}</Text>
             </View>
           </View>
+
+          {/* Follow Button (Highly Visible) */}
+          <TouchableOpacity
+            style={[styles.followBtn, isFollowing ? styles.followingBtn : styles.unfollowBtn]}
+            onPress={toggleFollow}
+            activeOpacity={0.8}
+          >
+            {isFollowing ? <BellRing color="#fff" size={18} /> : <Zap color="#10b981" size={18} fill="#10b981" />}
+            <View>
+              <Text style={[styles.followBtnText, isFollowing ? { color: '#fff' } : { color: '#10b981' }]}>
+                {isFollowing ? "ALERTS ACTIVE" : "GET INSTANT GOAL ALERTS"}
+              </Text>
+              {!isFollowing && (
+                <Text style={styles.followSubText}>Tap to enable real-time notifications</Text>
+              )}
+            </View>
+          </TouchableOpacity>
 
           {/* Advanced Stats Loader */}
           {isLoadingStats ? (
@@ -183,11 +245,17 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 40 },
 
   profileCard: { backgroundColor: '#0B1121', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#1e293b', marginBottom: 20 },
-  profileTop: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
+  profileTop: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
   logo: { fontSize: 48, backgroundColor: '#020617', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#1e293b', overflow: 'hidden' },
   titleContainer: { flex: 1 },
   teamName: { color: '#ffffff', fontSize: 24, fontWeight: '900', marginBottom: 4 },
   teamCountry: { color: '#94a3b8', fontSize: 12, fontWeight: 'bold' },
+
+  followBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, borderRadius: 12, borderWidth: 1, marginBottom: 20, shadowColor: "#10b981", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 },
+  unfollowBtn: { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.4)' },
+  followingBtn: { backgroundColor: '#10b981', borderColor: '#059669', shadowColor: "transparent", elevation: 0 },
+  followBtnText: { fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
+  followSubText: { color: '#10b981', fontSize: 9, fontWeight: 'bold', marginTop: 2, opacity: 0.8 },
 
   tacticalContainer: { flexDirection: 'row', backgroundColor: '#020617', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#1e293b', marginBottom: 12 },
   statItem: { flex: 1, alignItems: 'center', gap: 4 },
