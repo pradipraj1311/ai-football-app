@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Platform, ScrollView, PermissionsAndroid, Alert, LayoutAnimation, UIManager } from 'react-native';
-import { Activity, Calendar, History, ListOrdered, Shield, Trophy, BellRing } from 'lucide-react-native';
+import { Activity, Calendar, History, ListOrdered, Shield, Trophy, BellRing, BrainCircuit } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Modular imports for Firebase v22+
@@ -12,9 +12,10 @@ import MatchDetails from './src/components/MatchDetails';
 import TeamProfile from './src/components/TeamProfile';
 import AiCommentaryCard from './src/components/AiCommentaryCard';
 import AiForecasterCard from './src/components/AiForecasterCard';
-import { fetchLiveMatches, fetchUpcomingMatches, fetchCompletedMatches, fetchTeams } from './src/api/matchApi';
+import { fetchLiveMatches, fetchTeams } from './src/api/matchApi';
 import FanPoll from './src/components/FanPoll';
 import StandingsTable from './src/components/StandingsTable';
+import TriviaQuiz from './src/components/TriviaQuiz'; // NEW: Trivia Quiz Component
 
 // Enable LayoutAnimation for Android
 if (
@@ -40,6 +41,7 @@ export default function App() {
     { id: 'STANDINGS', label: 'Table', icon: ListOrdered },
     { id: 'TEAMS', label: 'Teams', icon: Shield },
     { id: 'POLL', label: 'Poll', icon: Trophy },
+    { id: 'QUIZ', label: 'Quiz', icon: BrainCircuit }, // NEW: Quiz Tab
   ];
 
   // Primary Data Loading
@@ -124,16 +126,21 @@ export default function App() {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // Refresh matches for the current tab and also refresh the teams list
-    const [freshMatchData, freshTeamData] = await Promise.all([
-      loadMatchesForTab(activeTab),
-      fetchTeams()
-    ]);
-    setMatches(freshMatchData);
-    if (freshTeamData && freshTeamData.length > 0) {
-      setTeams(freshTeamData);
+    try {
+      // Refresh matches and teams list safely
+      const [freshMatchData, freshTeamData] = await Promise.all([
+        fetchLiveMatches(),
+        fetchTeams()
+      ]);
+      setMatches(freshMatchData || []);
+      if (freshTeamData && freshTeamData.length > 0) {
+        setTeams(freshTeamData);
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
     }
-    setIsRefreshing(false);
   };
 
   const handleTabChange = (tabId) => {
@@ -158,7 +165,7 @@ export default function App() {
       <View style={styles.container}>
         <Navbar />
 
-        {/* 🌟 NEW: DISCOVERABLE FOLLOW BANNER 🌟 */}
+        {/* DISCOVERABLE FOLLOW BANNER */}
         {activeTab !== 'TEAMS' && !selectedTeam && !selectedMatch && (
           <TouchableOpacity
             style={styles.followBanner}
@@ -206,9 +213,13 @@ export default function App() {
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
                 <FanPoll />
               </ScrollView>
+            ) : activeTab === 'QUIZ' ? ( // NEW: Render Trivia Quiz Component
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
+                <TriviaQuiz />
+              </ScrollView>
             ) : activeTab === 'TEAMS' ? (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
-                {/* ✨ NEW: INSTRUCTIONAL TEXT FOR TEAMS TAB ✨ */}
+                {/* INSTRUCTIONAL TEXT FOR TEAMS TAB */}
                 <Text style={styles.teamsInstruction}>
                   Select your favorite team to get instant goal alerts!
                 </Text>
